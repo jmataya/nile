@@ -14,7 +14,7 @@ type segment interface {
 	HasParam() bool
 	ParamName() (string, error)
 
-	Match(path string) (segment, bool)
+	Match(path string) (*routeMatch, bool)
 	Segments() []segment
 }
 
@@ -81,32 +81,46 @@ func (rs *routeSegment) Segments() []segment {
 	return rs.segments
 }
 
-func (rs *routeSegment) Match(path string) (segment, bool) {
+func (rs *routeSegment) Match(path string) (*routeMatch, bool) {
+	rm := &routeMatch{
+		URI:    path,
+		Params: []*routeParam{},
+	}
+
+	hasMatch := match(path, rs, rm)
+	if hasMatch {
+		return rm, true
+	}
+
+	return nil, false
+}
+
+func match(path string, seg segment, routeMatch *routeMatch) bool {
 	headMatches := false
 
 	// Split the head from the tail of the path to match.
 	head, tail := splitPath(path)
 
-	if head == rs.path {
+	if head == seg.Path() {
 		headMatches = true
-	} else if rs.HasParam() && len(head) > 0 {
+	} else if seg.HasParam() && len(head) > 0 {
 		headMatches = true
 	}
 
 	if !headMatches {
-		return nil, false
+		return false
 	}
 
-	if tail == "" && len(rs.segments) == 0 {
-		return rs, true
+	if tail == "" && len(seg.Segments()) == 0 {
+		return true
 	}
 
-	for _, seg := range rs.segments {
-		matching, hasMatch := seg.Match(tail)
+	for _, childSeg := range seg.Segments() {
+		hasMatch := match(tail, childSeg, routeMatch)
 		if hasMatch {
-			return matching, true
+			return true
 		}
 	}
 
-	return nil, false
+	return false
 }
