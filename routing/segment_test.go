@@ -1,6 +1,60 @@
 package routing
 
-import "testing"
+import (
+	"testing"
+)
+
+func TestSegmentChildren(t *testing.T) {
+	var tests = []struct {
+		insertions   []string
+		wantChildren []string
+	}{
+		{
+			insertions:   []string{"abc", "def"},
+			wantChildren: []string{"def", "abc"},
+		},
+		{
+			insertions:   []string{"def", "abc"},
+			wantChildren: []string{"def", "abc"},
+		},
+		{
+			insertions:   []string{"/products/abc", "/products/def"},
+			wantChildren: []string{"products"},
+		},
+		{
+			insertions:   []string{"/products/def", "/products/abc"},
+			wantChildren: []string{"products"},
+		},
+	}
+
+	var errAdding bool
+	for testIdx, test := range tests {
+		root := NewSegment("/")
+		for _, toInsert := range test.insertions {
+			child := NewSegment(toInsert)
+			if err := root.AddChild(child); err != nil {
+				t.Errorf("Segment.AddChild({path: %s}) error, want <nil>, got %v", child.Path(), err)
+				errAdding = true
+			}
+		}
+
+		if errAdding {
+			continue
+		}
+
+		gotChildren := root.Children()
+		if len(gotChildren) != len(test.wantChildren) {
+			t.Errorf("len(Segment.Children()), want %d, got %d", len(test.wantChildren), len(gotChildren))
+			continue
+		}
+
+		for idx, wantChild := range test.wantChildren {
+			if wantChild != gotChildren[idx].Path() {
+				t.Errorf("Test %d: Path of child %d, want %s, got %s", testIdx, idx, wantChild, gotChildren[idx].Path())
+			}
+		}
+	}
+}
 
 func TestSegmentMatching(t *testing.T) {
 	var tests = []struct {

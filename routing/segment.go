@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -45,10 +46,11 @@ type Segment interface {
 func NewSegment(path string) Segment {
 	head, tail := splitPath(path)
 	seg := &segment{
-		path:      head,
-		parent:    nil,
-		children:  map[string]Segment{},
-		endpoints: map[string]Endpoint{},
+		path:       head,
+		parent:     nil,
+		children:   map[string]Segment{},
+		childOrder: []string{},
+		endpoints:  map[string]Endpoint{},
 	}
 
 	if tail != "" {
@@ -93,10 +95,11 @@ func NewSegmentEndpoint(path, method string) (Segment, error) {
 }
 
 type segment struct {
-	path      string
-	parent    Segment
-	children  map[string]Segment
-	endpoints map[string]Endpoint
+	path       string
+	parent     Segment
+	children   map[string]Segment
+	childOrder []string
+	endpoints  map[string]Endpoint
 }
 
 func (s *segment) Path() string {
@@ -113,22 +116,82 @@ func (s *segment) SetParent(parent Segment) {
 }
 
 func (s *segment) Children() []Segment {
-	children := make([]Segment, len(s.children))
-	idx := 0
-	for _, child := range s.children {
-		children[idx] = child
-		idx++
+	children := make([]Segment, len(s.childOrder))
+	for idx, childPath := range s.childOrder {
+		children[idx] = s.children[childPath]
 	}
 	return children
 }
 
 func (s *segment) AddChild(child Segment) error {
-	if _, exists := s.children[child.Path()]; exists {
-		return fmt.Errorf("Unable to add child %s to segment %s: child already exists", child.Path(), s.path)
+	if currentChild, exists := s.children[child.Path()]; exists {
+		merged, err := mergeSegments(currentChild, child)
+		if err != nil {
+			return err
+		}
+
+		s.children[child.Path()] = merged
+		return nil
 	}
 
 	s.children[child.Path()] = child
+
+	for idx, childPath := range s.childOrder {
+		if strings.Compare(child.Path(), childPath) == 1 {
+			s.childOrder = append(s.childOrder, "")
+			copy(s.childOrder[idx+1:], s.childOrder[idx:])
+			s.childOrder[idx] = child.Path()
+
+			return nil
+		}
+	}
+
+	s.childOrder = append(s.childOrder, child.Path())
 	return nil
+}
+
+func mergeSegments(first, second Segment) (Segment, error) {
+	if first.Path() != second.Path() {
+		return nil, errors.New("May only merge segments with the same path")
+	}
+
+	merged := NewSegment(first.Path())
+
+	addChildren := func(children []Segment) error {
+		for _, child := range children {
+			if err := merged.AddChild(child); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	addEndpoints := func(endpoints []Endpoint) error {
+		for _, endpoint := range endpoints {
+			if err := merged.AddEndpoint(endpoint); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	if err := addChildren(first.Children()); err != nil {
+		return nil, err
+	}
+	if err := addChildren(second.Children()); err != nil {
+		return nil, err
+	}
+
+	if err := addEndpoints(first.Endpoints()); err != nil {
+		return nil, err
+	}
+	if err := addEndpoints(second.Endpoints()); err != nil {
+		return nil, err
+	}
+
+	return merged, nil
 }
 
 func (s *segment) RemoveChild(path string) error {
