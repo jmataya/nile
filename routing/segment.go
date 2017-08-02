@@ -39,7 +39,7 @@ type Segment interface {
 
 	// Matches checks a path and method against the current Segment's endpoints.
 	// If a match doesn't exist, it checks against the Segment's children.
-	Matches(path, method string) (Endpoint, bool)
+	Matches(path, method string) (*Match, bool)
 }
 
 // NewSegment accepts a path and creates a new Segment.
@@ -233,7 +233,7 @@ func (s *segment) RemoveEndpoint(method string) error {
 	return nil
 }
 
-func (s *segment) Matches(path, method string) (Endpoint, bool) {
+func (s *segment) Matches(path, method string) (*Match, bool) {
 	head, tail := splitPath(path)
 
 	if head != s.path && !isParam(s.path) {
@@ -243,14 +243,26 @@ func (s *segment) Matches(path, method string) (Endpoint, bool) {
 	if tail == "" {
 		// Check the endpoints
 		endPt, matches := s.endpoints[method]
-		return endPt, matches
+		if matches {
+			match := NewMatch(endPt, path, method)
+			if isParam(s.path) {
+				match.AddParam(s.path[1:], head)
+			}
+			return match, true
+		}
+
+		return nil, false
 	}
 
 	// Check the children
 	for _, child := range s.children {
-		endPt, matches := child.Matches(tail, method)
+		match, matches := child.Matches(tail, method)
 		if matches {
-			return endPt, matches
+			match.RequestURI = path
+			if isParam(s.path) {
+				match.AddParam(s.path[1:], head)
+			}
+			return match, matches
 		}
 	}
 

@@ -63,15 +63,17 @@ func TestSegmentMatching(t *testing.T) {
 		wantPath   string
 		wantMethod string
 		wantMatch  bool
+		wantParams map[string]string
 	}{
-		{"/products", "GET", "products", "GET", true},
-		{"/products", "GET", "/products", "GET", true},
-		{"/products", "GET", "/products/new", "GET", false},
-		{"/products/new", "GET", "/products/new", "GET", true},
-		{"/products/:id", "GET", "/products/1", "GET", true},
-		{"/products/:id", "GET", "/products/1", "POST", false},
-		{"/products", "GET", "/product", "GET", false},
-		{"/products", "POST", "/products", "GET", false},
+		{"/products", "GET", "products", "GET", true, map[string]string{}},
+		{"/products", "GET", "/products", "GET", true, map[string]string{}},
+		{"/products", "GET", "/products/new", "GET", false, map[string]string{}},
+		{"/products/new", "GET", "/products/new", "GET", true, map[string]string{}},
+		{"/products/:id", "GET", "/products/1", "GET", true, map[string]string{"id": "1"}},
+		{"/products/:id", "GET", "/products/1", "POST", false, map[string]string{}},
+		{"/products", "GET", "/product", "GET", false, map[string]string{}},
+		{"/products", "POST", "/products", "GET", false, map[string]string{}},
+		{"/products/:id/edit", "PATCH", "/products/4/edit", "PATCH", true, map[string]string{"id": "4"}},
 	}
 
 	for _, test := range tests {
@@ -81,18 +83,31 @@ func TestSegmentMatching(t *testing.T) {
 			continue
 		}
 
-		gotEndPt, gotMatch := seg.Matches(test.wantPath, test.wantMethod)
-		if test.wantMatch != gotMatch {
-			t.Errorf("Segment.Matches(%s, %s) match, want %v, got %v", test.wantPath, test.wantMethod, test.wantMatch, gotMatch)
+		gotMatch, gotMatches := seg.Matches(test.wantPath, test.wantMethod)
+		if test.wantMatch != gotMatches {
+			t.Errorf("Segment.Matches(%s, %s) match, want %v, got %v", test.wantPath, test.wantMethod, test.wantMatch, gotMatches)
 			continue
 		}
 
-		if !gotMatch {
+		if !gotMatches {
 			continue
 		}
 
-		if gotEndPt.Method() != test.wantMethod {
-			t.Errorf("Endpoint.Method(), want %s, got %s", test.wantMethod, gotEndPt.Method())
+		if gotMatch.RequestMethod != test.wantMethod {
+			t.Errorf("Match.RequestMethod, want %s, got %s", test.wantMethod, gotMatch.RequestMethod)
+			continue
+		}
+
+		if gotMatch.RequestURI != test.wantPath {
+			t.Errorf("Match.RequestURI, want %s, got %s", test.wantPath, gotMatch.RequestURI)
+			continue
+		}
+
+		for paramName, paramValue := range test.wantParams {
+			actualValue, found := gotMatch.Param(paramName)
+			if !found || actualValue != paramValue {
+				t.Errorf("Match.Param(%s), want (%s, true), got (%s, %v)", paramName, paramValue, actualValue, found)
+			}
 		}
 	}
 }
