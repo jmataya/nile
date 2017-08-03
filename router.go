@@ -2,7 +2,10 @@ package nile
 
 import (
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -31,6 +34,8 @@ func (r *router) Start(addr string) error {
 		WriteTimeout:   10 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}
+
+	printLogo(addr)
 
 	return server.ListenAndServe()
 }
@@ -99,4 +104,31 @@ func (r *router) GET(path string, fn HandlerFunc) error {
 	}
 
 	return nil
+}
+
+func printLogo(addr string) {
+	const logo = `
+      (_) |     
+ _ __  _| | ___ 
+| '_ \| | |/ _ \
+| | | | | |  __/
+|_| |_|_|_|\___|
+`
+
+	fmt.Println(logo)
+	fmt.Println(formatAddress(addr))
+}
+
+func formatAddress(addr string) string {
+	if string(addr[0]) == ":" {
+		// Assume this means we start with the port.
+		addr = "http://localhost" + addr
+	}
+
+	url, err := url.Parse(addr)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return fmt.Sprintf("Server started on: %s", url.String())
 }
