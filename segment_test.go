@@ -1,6 +1,8 @@
 package nile
 
 import (
+	"log"
+	"net/http"
 	"testing"
 )
 
@@ -53,6 +55,52 @@ func TestSegmentChildren(t *testing.T) {
 				t.Errorf("Test %d: Path of child %d, want %s, got %s", testIdx, idx, wantChild, gotChildren[idx].Path())
 			}
 		}
+	}
+}
+
+func TestAdvancedSegmentMatching(t *testing.T) {
+	var called bool
+
+	badHandler := func(c *Context) Response {
+		called = false
+		return InternalServiceError
+	}
+
+	goodHandler := func(c *Context) Response {
+		called = true
+		return InternalServiceError
+	}
+
+	dynamic, err := NewSegmentEndpoint("/products/:id", http.MethodGet, badHandler)
+	if err != nil {
+		t.Errorf("NewSegmentEndpoint(%s, %s, fn), want <nil> err, got %v err", "/products/:id", http.MethodGet, err)
+		return
+	}
+
+	static, err := NewSegmentEndpoint("/products/new", http.MethodGet, goodHandler)
+	if err != nil {
+		t.Errorf("NewSegmentEndpoint(%s, %s, fn), want <nil> err, got %v err", "/products/new", http.MethodGet, err)
+		return
+	}
+
+	merged, err := MergeSegments(dynamic, static)
+	if err != nil {
+		t.Errorf("MergeSegments(), want <nil> err, got %v err", err)
+		return
+	}
+
+	endpoints := merged.Endpoints()
+	log.Printf("%+v", endpoints)
+
+	gotMatch, hasMatch := merged.Matches("/products/new", "GET")
+	if !hasMatch {
+		t.Errorf("Segment.Matches(%s, %s), want matches %v, got matches %v", "/products/new", "GET", true, hasMatch)
+		return
+	}
+
+	gotMatch.Endpoint.Handler()(nil)
+	if !called {
+		t.Error("Expected called to have been executed.")
 	}
 }
 

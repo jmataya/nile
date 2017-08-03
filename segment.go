@@ -99,6 +99,7 @@ type segment struct {
 	parent     Segment
 	children   map[string]Segment
 	childOrder []string
+	paramChild Segment
 	endpoints  map[string]Endpoint
 }
 
@@ -120,10 +121,24 @@ func (s *segment) Children() []Segment {
 	for idx, childPath := range s.childOrder {
 		children[idx] = s.children[childPath]
 	}
+
+	if s.paramChild != nil {
+		children = append(children, s.paramChild)
+	}
+
 	return children
 }
 
 func (s *segment) AddChild(child Segment) error {
+	if isParam(child.Path()) {
+		if s.paramChild != nil {
+			return fmt.Errorf("Segment %s already has a route with a parameter", s.Path())
+		}
+
+		s.paramChild = child
+		return nil
+	}
+
 	if currentChild, exists := s.children[child.Path()]; exists {
 		merged, err := MergeSegments(currentChild, child)
 		if err != nil {
@@ -195,6 +210,11 @@ func MergeSegments(first, second Segment) (Segment, error) {
 }
 
 func (s *segment) RemoveChild(path string) error {
+	if isParam(path) {
+		s.paramChild = nil
+		return nil
+	}
+
 	if _, exists := s.children[path]; !exists {
 		return fmt.Errorf("Unable to remove child %s from segment %s: child does not exist", path, s.path)
 	}
@@ -262,6 +282,15 @@ func (s *segment) Matches(path, method string) (*Match, bool) {
 			if isParam(s.path) {
 				match.AddParam(s.path[1:], head)
 			}
+			return match, matches
+		}
+	}
+
+	if s.paramChild != nil {
+		match, matches := s.paramChild.Matches(tail, method)
+		if matches {
+			match.RequestURI = path
+			match.AddParam(s.path[1:], head)
 			return match, matches
 		}
 	}

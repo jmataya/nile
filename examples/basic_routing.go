@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -19,6 +20,26 @@ func main() {
 	r.GET("/world", func(c *nile.Context) nile.Response {
 		return basicResp{
 			Message:    "world",
+			statusCode: http.StatusOK,
+		}
+	})
+
+	r.GET("/products/:id", func(c *nile.Context) nile.Response {
+		id, _ := c.Param("id")
+		message := fmt.Sprintf("Found product %s", id)
+
+		return basicResp{
+			Message:    message,
+			statusCode: http.StatusOK,
+		}
+	})
+
+	r.GET("/products/:id/edit", func(c *nile.Context) nile.Response {
+		id, _ := c.Param("id")
+		message := fmt.Sprintf("Editing product %s", id)
+
+		return basicResp{
+			Message:    message,
 			statusCode: http.StatusOK,
 		}
 	})
