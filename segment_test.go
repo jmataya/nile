@@ -92,13 +92,19 @@ func TestAdvancedSegmentMatching(t *testing.T) {
 	endpoints := merged.Endpoints()
 	log.Printf("%+v", endpoints)
 
-	gotMatch, hasMatch := merged.Matches("/products/new", "GET")
+	gotMatch, hasMatch := merged.Matches("/products/new")
 	if !hasMatch {
-		t.Errorf("Segment.Matches(%s, %s), want matches %v, got matches %v", "/products/new", "GET", true, hasMatch)
+		t.Errorf("Segment.Matches(%s), want matches %v, got matches %v", "/products/new", true, hasMatch)
 		return
 	}
 
-	gotMatch.Endpoint.Handler()(nil)
+	gotEndpoint, found := gotMatch.Segment.Endpoint("GET")
+	if !found {
+		t.Errorf("Segment.Endpoint(GET), want found true, got found %v", found)
+		return
+	}
+
+	gotEndpoint.Handler()(nil)
 	if !called {
 		t.Error("Expected called to have been executed.")
 	}
@@ -113,19 +119,16 @@ func TestSegmentMatching(t *testing.T) {
 		uri        string
 		method     string
 		wantPath   string
-		wantMethod string
 		wantMatch  bool
 		wantParams map[string]string
 	}{
-		{"/products", "GET", "products", "GET", true, map[string]string{}},
-		{"/products", "GET", "/products", "GET", true, map[string]string{}},
-		{"/products", "GET", "/products/new", "GET", false, map[string]string{}},
-		{"/products/new", "GET", "/products/new", "GET", true, map[string]string{}},
-		{"/products/:id", "GET", "/products/1", "GET", true, map[string]string{"id": "1"}},
-		{"/products/:id", "GET", "/products/1", "POST", false, map[string]string{}},
-		{"/products", "GET", "/product", "GET", false, map[string]string{}},
-		{"/products", "POST", "/products", "GET", false, map[string]string{}},
-		{"/products/:id/edit", "PATCH", "/products/4/edit", "PATCH", true, map[string]string{"id": "4"}},
+		{"/products", "GET", "products", true, map[string]string{}},
+		{"/products", "GET", "/products", true, map[string]string{}},
+		{"/products", "GET", "/products/new", false, map[string]string{}},
+		{"/products/new", "GET", "/products/new", true, map[string]string{}},
+		{"/products/:id", "GET", "/products/1", true, map[string]string{"id": "1"}},
+		{"/products", "GET", "/product", false, map[string]string{}},
+		{"/products/:id/edit", "PATCH", "/products/4/edit", true, map[string]string{"id": "4"}},
 	}
 
 	for _, test := range tests {
@@ -135,18 +138,13 @@ func TestSegmentMatching(t *testing.T) {
 			continue
 		}
 
-		gotMatch, gotMatches := seg.Matches(test.wantPath, test.wantMethod)
+		gotMatch, gotMatches := seg.Matches(test.wantPath)
 		if test.wantMatch != gotMatches {
-			t.Errorf("Segment.Matches(%s, %s) match, want %v, got %v", test.wantPath, test.wantMethod, test.wantMatch, gotMatches)
+			t.Errorf("Segment.Matches(%s) match, want %v, got %v", test.wantPath, test.wantMatch, gotMatches)
 			continue
 		}
 
 		if !gotMatches {
-			continue
-		}
-
-		if gotMatch.RequestMethod != test.wantMethod {
-			t.Errorf("Match.RequestMethod, want %s, got %s", test.wantMethod, gotMatch.RequestMethod)
 			continue
 		}
 

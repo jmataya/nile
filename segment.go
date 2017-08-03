@@ -26,6 +26,9 @@ type Segment interface {
 	// path.
 	Endpoints() []Endpoint
 
+	// Endpoint gets the Endpoint that matches an HTTP method.
+	Endpoint(method string) (Endpoint, bool)
+
 	// AddEndpoint adds an Endpoint to the Segment.
 	AddEndpoint(endPt Endpoint) error
 
@@ -37,9 +40,9 @@ type Segment interface {
 	// SetParent sets the Segment that preceds the current Segment in the path.
 	SetParent(parent Segment)
 
-	// Matches checks a path and method against the current Segment's endpoints.
+	// Matches checks a path against the current Segment's endpoints.
 	// If a match doesn't exist, it checks against the Segment's children.
-	Matches(path, method string) (*Match, bool)
+	Matches(path string) (*Match, bool)
 }
 
 // NewSegment accepts a path and creates a new Segment.
@@ -223,6 +226,11 @@ func (s *segment) RemoveChild(path string) error {
 	return nil
 }
 
+func (s *segment) Endpoint(method string) (Endpoint, bool) {
+	endpoint, found := s.endpoints[method]
+	return endpoint, found
+}
+
 func (s *segment) Endpoints() []Endpoint {
 	endpoints := make([]Endpoint, len(s.endpoints))
 	idx := 0
@@ -253,7 +261,7 @@ func (s *segment) RemoveEndpoint(method string) error {
 	return nil
 }
 
-func (s *segment) Matches(path, method string) (*Match, bool) {
+func (s *segment) Matches(path string) (*Match, bool) {
 	head, tail := splitPath(path)
 
 	if head != s.path && !isParam(s.path) {
@@ -261,22 +269,16 @@ func (s *segment) Matches(path, method string) (*Match, bool) {
 	}
 
 	if tail == "" {
-		// Check the endpoints
-		endPt, matches := s.endpoints[method]
-		if matches {
-			match := NewMatch(endPt, path, method)
-			if isParam(s.path) {
-				match.AddParam(s.path[1:], head)
-			}
-			return match, true
+		match := NewMatch(s, path)
+		if isParam(s.path) {
+			match.AddParam(s.path[1:], head)
 		}
-
-		return nil, false
+		return match, true
 	}
 
 	// Check the children
 	for _, child := range s.children {
-		match, matches := child.Matches(tail, method)
+		match, matches := child.Matches(tail)
 		if matches {
 			match.RequestURI = path
 			if isParam(s.path) {
@@ -287,7 +289,7 @@ func (s *segment) Matches(path, method string) (*Match, bool) {
 	}
 
 	if s.paramChild != nil {
-		match, matches := s.paramChild.Matches(tail, method)
+		match, matches := s.paramChild.Matches(tail)
 		if matches {
 			match.RequestURI = path
 			match.AddParam(s.path[1:], head)

@@ -42,7 +42,7 @@ func (r *router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var match *Match
 	var hasMatch bool
 	for _, segment := range r.segments {
-		match, hasMatch = segment.Matches(path, method)
+		match, hasMatch = segment.Matches(path)
 		if hasMatch {
 			break
 		}
@@ -53,9 +53,15 @@ func (r *router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	endpoint, found := match.Segment.Endpoint(method)
+	if !found {
+		r.writeResponse(MethodNotAllowed, w)
+		return
+	}
+
 	context := match.Context
 	context.Request = req
-	handler := match.Endpoint.Handler()
+	handler := endpoint.Handler()
 
 	resp := handler(context)
 	r.writeResponse(resp, w)

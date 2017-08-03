@@ -3,19 +3,17 @@ package nile
 // Match is a structure that contains the data for when a request matches an
 // endpoint.
 type Match struct {
-	Endpoint      Endpoint
-	Context       *Context
-	RequestURI    string
-	RequestMethod string
+	Segment    Segment
+	Context    *Context
+	RequestURI string
 }
 
 // NewMatch creates a new Match object.
-func NewMatch(endPt Endpoint, path string, method string) *Match {
+func NewMatch(segment Segment, path string) *Match {
 	return &Match{
-		Endpoint:      endPt,
-		Context:       &Context{params: map[string]string{}},
-		RequestURI:    path,
-		RequestMethod: method,
+		Segment:    segment,
+		Context:    &Context{params: map[string]string{}},
+		RequestURI: path,
 	}
 }
 
