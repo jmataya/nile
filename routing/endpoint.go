@@ -14,12 +14,15 @@ const (
 // endpoint that can be hit via an HTTP request. It contains an HTTP method
 // and handler for when the request matches.
 type Endpoint interface {
+	// Handler is the method to call when the request the Endpoint.
+	Handler() HandlerFunc
+
 	// Method gets the HTTP method to which Endpoint will respond.
 	Method() string
 }
 
 // NewEndpoint creates a new, valid Endpoint based on an HTTP method.
-func NewEndpoint(method string) (Endpoint, error) {
+func NewEndpoint(method string, handler HandlerFunc) (Endpoint, error) {
 	// Validate that method is a currently supported HTTP method.
 	isSupported, ok := supportedMethods[method]
 	if !ok {
@@ -28,7 +31,10 @@ func NewEndpoint(method string) (Endpoint, error) {
 		return nil, fmt.Errorf(errUnsupportedMethod, method)
 	}
 
-	return &httpEndpoint{method: method}, nil
+	return &httpEndpoint{
+		method:  method,
+		handler: handler,
+	}, nil
 }
 
 var supportedMethods = map[string]bool{
@@ -44,7 +50,12 @@ var supportedMethods = map[string]bool{
 }
 
 type httpEndpoint struct {
-	method string
+	handler HandlerFunc
+	method  string
+}
+
+func (h *httpEndpoint) Handler() HandlerFunc {
+	return h.handler
 }
 
 func (h *httpEndpoint) Method() string {

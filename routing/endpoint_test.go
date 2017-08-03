@@ -29,7 +29,11 @@ func TestEndpointMethods(t *testing.T) {
 	for _, test := range tests {
 		method := test.method
 
-		endpoint, err := NewEndpoint(method)
+		dummyHandler := func(Context) Response {
+			return internalServiceError
+		}
+
+		endpoint, err := NewEndpoint(method, dummyHandler)
 		if !utils.CheckError(test.want, err) {
 			t.Errorf("NewEndpoint(%s) error, want %v, got %v", method, test.want, err)
 			continue

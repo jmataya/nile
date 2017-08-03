@@ -63,6 +63,10 @@ func NewSegment(path string) Segment {
 // NewSegmentEndpoint creates a Segment and attaches an Endpoint at the leaf
 // node.
 func NewSegmentEndpoint(path, method string) (Segment, error) {
+	dummyHandler := func(Context) Response {
+		return internalServiceError
+	}
+
 	head, tail := splitPath(path)
 	seg := &segment{
 		path:      head,
@@ -81,7 +85,7 @@ func NewSegmentEndpoint(path, method string) (Segment, error) {
 			return nil, err
 		}
 	} else {
-		endPt, err := NewEndpoint(method)
+		endPt, err := NewEndpoint(method, dummyHandler)
 		if err != nil {
 			return nil, err
 		}
