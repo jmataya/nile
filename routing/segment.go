@@ -62,11 +62,7 @@ func NewSegment(path string) Segment {
 
 // NewSegmentEndpoint creates a Segment and attaches an Endpoint at the leaf
 // node.
-func NewSegmentEndpoint(path, method string) (Segment, error) {
-	dummyHandler := func(Context) Response {
-		return internalServiceError
-	}
-
+func NewSegmentEndpoint(path string, method string, handler HandlerFunc) (Segment, error) {
 	head, tail := splitPath(path)
 	seg := &segment{
 		path:      head,
@@ -76,7 +72,7 @@ func NewSegmentEndpoint(path, method string) (Segment, error) {
 	}
 
 	if tail != "" {
-		child, err := NewSegmentEndpoint(tail, method)
+		child, err := NewSegmentEndpoint(tail, method, handler)
 		if err != nil {
 			return nil, err
 		}
@@ -85,7 +81,7 @@ func NewSegmentEndpoint(path, method string) (Segment, error) {
 			return nil, err
 		}
 	} else {
-		endPt, err := NewEndpoint(method, dummyHandler)
+		endPt, err := NewEndpoint(method, handler)
 		if err != nil {
 			return nil, err
 		}
@@ -129,7 +125,7 @@ func (s *segment) Children() []Segment {
 
 func (s *segment) AddChild(child Segment) error {
 	if currentChild, exists := s.children[child.Path()]; exists {
-		merged, err := mergeSegments(currentChild, child)
+		merged, err := MergeSegments(currentChild, child)
 		if err != nil {
 			return err
 		}
@@ -154,7 +150,7 @@ func (s *segment) AddChild(child Segment) error {
 	return nil
 }
 
-func mergeSegments(first, second Segment) (Segment, error) {
+func MergeSegments(first, second Segment) (Segment, error) {
 	if first.Path() != second.Path() {
 		return nil, errors.New("May only merge segments with the same path")
 	}

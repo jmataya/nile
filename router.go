@@ -4,22 +4,24 @@ import (
 	"encoding/json"
 	"net/http"
 	"time"
+
+	"github.com/jmataya/nile/routing"
 )
 
 // Router is the basic foundation of the HTTP server.
 type Router interface {
-	GET(path string, fn HandlerFunc) error
+	GET(path string, fn routing.HandlerFunc) error
 	Start(addr string) error
 }
 
 type router struct {
-	routes []*route
+	segments map[string]routing.Segment
 }
 
 // New creates a new Router instance.
 func New() Router {
 	return &router{
-		routes: []*route{},
+		segments: map[string]routing.Segment{},
 	}
 }
 
@@ -36,36 +38,32 @@ func (r *router) Start(addr string) error {
 }
 
 func (r *router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	var matchingRoute *route
-	for _, route := range r.routes {
-		match, err := route.MatchPath(req.URL.Path)
-		if err != nil {
-			r.writeResponse(internalServiceError, w)
-			return
-		}
+	path := req.URL.Path
+	method := req.Method
 
-		if match {
-			matchingRoute = route
+	var match *routing.Match
+	var hasMatch bool
+	for _, segment := range r.segments {
+		match, hasMatch = segment.Matches(path, method)
+		if hasMatch {
 			break
 		}
 	}
 
-	if matchingRoute == nil {
-		r.writeResponse(resourceNotFound, w)
+	if !hasMatch {
+		r.writeResponse(routing.ResourceNotFound, w)
 		return
 	}
 
-	method, ok := matchingRoute.MethodHandlers[req.Method]
-	if !ok {
-		r.writeResponse(methodNotAllowed, w)
-		return
-	}
+	context := match.Context
+	context.Request = req
+	handler := match.Endpoint.Handler()
 
-	resp := method.Handler(nil)
+	resp := handler(context)
 	r.writeResponse(resp, w)
 }
 
-func (r *router) writeResponse(resp Response, w http.ResponseWriter) {
+func (r *router) writeResponse(resp routing.Response, w http.ResponseWriter) {
 	respBytes, err := json.Marshal(resp)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -78,53 +76,23 @@ func (r *router) writeResponse(resp Response, w http.ResponseWriter) {
 
 // GET adds a GET request for the matching path that executes the corresponding
 // HandlerFunc upon a match.
-func (r *router) GET(path string, fn HandlerFunc) error {
-	return r.add("GET", path, fn)
-}
-
-func (r *router) add(method string, path string, fn HandlerFunc) error {
-	newR, err := newRoute(method, path, fn)
+func (r *router) GET(path string, fn routing.HandlerFunc) error {
+	seg, err := routing.NewSegmentEndpoint(path, http.MethodGet, fn)
 	if err != nil {
 		return err
 	}
 
-	routes, err := addRoute(r.routes, newR)
-	if err != nil {
-		return err
-	}
-
-	r.routes = routes
-	return nil
-}
-
-func addRoute(routes []*route, r *route) ([]*route, error) {
-	if len(routes) == 0 {
-		return []*route{r}, nil
-	}
-
-	half := len(routes) / 2
-
-	var err error
-	var left []*route
-	var right []*route
-
-	switch r.Compare(routes[half]) {
-	case -1:
-		left = routes[:half]
-		right, err = addRoute(routes[half:], r)
-	case 1:
-		left, err = addRoute(routes[:half], r)
-		right = routes[half:]
-	default:
-		if err := routes[half].Merge(r); err != nil {
-			return nil, err
+	existing, found := r.segments[seg.Path()]
+	if found {
+		merged, err := routing.MergeSegments(existing, seg)
+		if err != nil {
+			return err
 		}
-		return routes, nil
+
+		r.segments[seg.Path()] = merged
+	} else {
+		r.segments[seg.Path()] = seg
 	}
 
-	if err != nil {
-		return nil, err
-	}
-
-	return append(left, right...), nil
+	return nil
 }

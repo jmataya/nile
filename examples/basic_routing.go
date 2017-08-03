@@ -5,18 +5,23 @@ import (
 	"net/http"
 
 	"github.com/jmataya/nile"
+	"github.com/jmataya/nile/routing"
 )
 
 func main() {
 	r := nile.New()
-	r.GET("/hello", func(c nile.Context) nile.Response {
+	err := r.GET("/hello", func(c *routing.Context) routing.Response {
 		return basicResp{
 			Message:    "hello",
 			statusCode: http.StatusOK,
 		}
 	})
 
-	r.GET("/world", func(c nile.Context) nile.Response {
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	r.GET("/world", func(c *routing.Context) routing.Response {
 		return basicResp{
 			Message:    "world",
 			statusCode: http.StatusOK,
