@@ -1,4 +1,4 @@
-package routing
+package nile
 
 import (
 	"testing"
@@ -57,6 +57,10 @@ func TestSegmentChildren(t *testing.T) {
 }
 
 func TestSegmentMatching(t *testing.T) {
+	dummyHandler := func(context *Context) Response {
+		return InternalServiceError
+	}
+
 	var tests = []struct {
 		uri        string
 		method     string
@@ -77,7 +81,7 @@ func TestSegmentMatching(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		seg, err := NewSegmentEndpoint(test.uri, test.method)
+		seg, err := NewSegmentEndpoint(test.uri, test.method, dummyHandler)
 		if err != nil {
 			t.Errorf("NewSegmentEndpoint(%s, %s) error, want <nil>, got %v", test.uri, test.method, err)
 			continue

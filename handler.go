@@ -1,4 +1,4 @@
-package routing
+package nile
 
 // HandlerFunc is the method signature for accepting an HTTP request and
 // delivering a response.

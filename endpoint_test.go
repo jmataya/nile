@@ -1,4 +1,4 @@
-package routing
+package nile
 
 import (
 	"fmt"
@@ -29,8 +29,8 @@ func TestEndpointMethods(t *testing.T) {
 	for _, test := range tests {
 		method := test.method
 
-		dummyHandler := func(Context) Response {
-			return internalServiceError
+		dummyHandler := func(*Context) Response {
+			return InternalServiceError
 		}
 
 		endpoint, err := NewEndpoint(method, dummyHandler)

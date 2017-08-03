@@ -4,24 +4,22 @@ import (
 	"encoding/json"
 	"net/http"
 	"time"
-
-	"github.com/jmataya/nile/routing"
 )
 
 // Router is the basic foundation of the HTTP server.
 type Router interface {
-	GET(path string, fn routing.HandlerFunc) error
+	GET(path string, fn HandlerFunc) error
 	Start(addr string) error
 }
 
 type router struct {
-	segments map[string]routing.Segment
+	segments map[string]Segment
 }
 
 // New creates a new Router instance.
 func New() Router {
 	return &router{
-		segments: map[string]routing.Segment{},
+		segments: map[string]Segment{},
 	}
 }
 
@@ -41,7 +39,7 @@ func (r *router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	path := req.URL.Path
 	method := req.Method
 
-	var match *routing.Match
+	var match *Match
 	var hasMatch bool
 	for _, segment := range r.segments {
 		match, hasMatch = segment.Matches(path, method)
@@ -51,7 +49,7 @@ func (r *router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	if !hasMatch {
-		r.writeResponse(routing.ResourceNotFound, w)
+		r.writeResponse(ResourceNotFound, w)
 		return
 	}
 
@@ -63,7 +61,7 @@ func (r *router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	r.writeResponse(resp, w)
 }
 
-func (r *router) writeResponse(resp routing.Response, w http.ResponseWriter) {
+func (r *router) writeResponse(resp Response, w http.ResponseWriter) {
 	respBytes, err := json.Marshal(resp)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -76,15 +74,15 @@ func (r *router) writeResponse(resp routing.Response, w http.ResponseWriter) {
 
 // GET adds a GET request for the matching path that executes the corresponding
 // HandlerFunc upon a match.
-func (r *router) GET(path string, fn routing.HandlerFunc) error {
-	seg, err := routing.NewSegmentEndpoint(path, http.MethodGet, fn)
+func (r *router) GET(path string, fn HandlerFunc) error {
+	seg, err := NewSegmentEndpoint(path, http.MethodGet, fn)
 	if err != nil {
 		return err
 	}
 
 	existing, found := r.segments[seg.Path()]
 	if found {
-		merged, err := routing.MergeSegments(existing, seg)
+		merged, err := MergeSegments(existing, seg)
 		if err != nil {
 			return err
 		}
