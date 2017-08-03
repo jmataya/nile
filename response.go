@@ -21,17 +21,17 @@ func (e errorResponse) Status() string {
 	return http.StatusText(e.statusCode)
 }
 
-var ResourceNotFound = errorResponse{
+var resourceNotFound = errorResponse{
 	Error:      "Resource not found",
 	statusCode: http.StatusNotFound,
 }
 
-var MethodNotAllowed = errorResponse{
+var methodNotAllowed = errorResponse{
 	Error:      "Method not allowed",
 	statusCode: http.StatusMethodNotAllowed,
 }
 
-var InternalServiceError = errorResponse{
+var internalServiceError = errorResponse{
 	Error:      "Internal service error",
 	statusCode: http.StatusInternalServerError,
 }

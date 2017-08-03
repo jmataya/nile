@@ -6,76 +6,47 @@ import (
 	"strings"
 )
 
-// Segment describes a portion of a URI path. Each Segment represents a subset
+// segment describes a portion of a URI path. Each Segment represents a subset
 // of the path between the forward-slash '/' of a URI. Segments are structured
 // into a tree that can be used to construct the full path.
-type Segment interface {
-	// Path gets the portion of the URI that is described by this Segment.
-	Path() string
-
-	// Children gets the list of paths that exist under the current path.
-	Children() []Segment
-
-	// AddChild adds a child path that should exist under the current path.
-	AddChild(child Segment) error
-
-	// RemoveChild removes a child path from the current path.
-	RemoveChild(path string) error
-
-	// Endpoints gets the list of HTTP endpoints that resolve exactly at this
-	// path.
-	Endpoints() []Endpoint
-
-	// Endpoint gets the Endpoint that matches an HTTP method.
-	Endpoint(method string) (Endpoint, bool)
-
-	// AddEndpoint adds an Endpoint to the Segment.
-	AddEndpoint(endPt Endpoint) error
-
-	// Parent gets the Segment that precedes the current Segment in the path. The
-	// second parameter of the tuple will return true if a parent exists. A lack
-	// of parent exists that this Segment is at the root.
-	Parent() (Segment, bool)
-
-	// SetParent sets the Segment that preceds the current Segment in the path.
-	SetParent(parent Segment)
-
-	// Matches checks a path against the current Segment's endpoints.
-	// If a match doesn't exist, it checks against the Segment's children.
-	Matches(path string) (*Match, bool)
+type segment struct {
+	// Path is the portion of the URI that is described by this Segment.
+	Path       string
+	children   map[string]*segment
+	childOrder []string
+	paramChild *segment
+	endpoints  map[string]endpoint
 }
 
-// NewSegment accepts a path and creates a new Segment.
-func NewSegment(path string) Segment {
+// newSegment accepts a path and creates a new Segment.
+func newSegment(path string) *segment {
 	head, tail := splitPath(path)
 	seg := &segment{
-		path:       head,
-		parent:     nil,
-		children:   map[string]Segment{},
+		Path:       head,
+		children:   map[string]*segment{},
 		childOrder: []string{},
-		endpoints:  map[string]Endpoint{},
+		endpoints:  map[string]endpoint{},
 	}
 
 	if tail != "" {
-		seg.AddChild(NewSegment(tail))
+		seg.AddChild(newSegment(tail))
 	}
 
 	return seg
 }
 
-// NewSegmentEndpoint creates a Segment and attaches an Endpoint at the leaf
+// newSegmentEndpoint creates a Segment and attaches an Endpoint at the leaf
 // node.
-func NewSegmentEndpoint(path string, method string, handler HandlerFunc) (Segment, error) {
+func newSegmentEndpoint(path string, method string, handler HandlerFunc) (*segment, error) {
 	head, tail := splitPath(path)
 	seg := &segment{
-		path:      head,
-		parent:    nil,
-		children:  map[string]Segment{},
-		endpoints: map[string]Endpoint{},
+		Path:      head,
+		children:  map[string]*segment{},
+		endpoints: map[string]endpoint{},
 	}
 
 	if tail != "" {
-		child, err := NewSegmentEndpoint(tail, method, handler)
+		child, err := newSegmentEndpoint(tail, method, handler)
 		if err != nil {
 			return nil, err
 		}
@@ -84,7 +55,7 @@ func NewSegmentEndpoint(path string, method string, handler HandlerFunc) (Segmen
 			return nil, err
 		}
 	} else {
-		endPt, err := NewEndpoint(method, handler)
+		endPt, err := newEndpoint(method, handler)
 		if err != nil {
 			return nil, err
 		}
@@ -97,85 +68,16 @@ func NewSegmentEndpoint(path string, method string, handler HandlerFunc) (Segmen
 	return seg, nil
 }
 
-type segment struct {
-	path       string
-	parent     Segment
-	children   map[string]Segment
-	childOrder []string
-	paramChild Segment
-	endpoints  map[string]Endpoint
-}
-
-func (s *segment) Path() string {
-	return s.path
-}
-
-func (s *segment) Parent() (Segment, bool) {
-	hasParent := s.parent != nil
-	return s.parent, hasParent
-}
-
-func (s *segment) SetParent(parent Segment) {
-	s.parent = parent
-}
-
-func (s *segment) Children() []Segment {
-	children := make([]Segment, len(s.childOrder))
-	for idx, childPath := range s.childOrder {
-		children[idx] = s.children[childPath]
-	}
-
-	if s.paramChild != nil {
-		children = append(children, s.paramChild)
-	}
-
-	return children
-}
-
-func (s *segment) AddChild(child Segment) error {
-	if isParam(child.Path()) {
-		if s.paramChild != nil {
-			return fmt.Errorf("Segment %s already has a route with a parameter", s.Path())
-		}
-
-		s.paramChild = child
-		return nil
-	}
-
-	if currentChild, exists := s.children[child.Path()]; exists {
-		merged, err := MergeSegments(currentChild, child)
-		if err != nil {
-			return err
-		}
-
-		s.children[child.Path()] = merged
-		return nil
-	}
-
-	s.children[child.Path()] = child
-
-	for idx, childPath := range s.childOrder {
-		if strings.Compare(child.Path(), childPath) == 1 {
-			s.childOrder = append(s.childOrder, "")
-			copy(s.childOrder[idx+1:], s.childOrder[idx:])
-			s.childOrder[idx] = child.Path()
-
-			return nil
-		}
-	}
-
-	s.childOrder = append(s.childOrder, child.Path())
-	return nil
-}
-
-func MergeSegments(first, second Segment) (Segment, error) {
-	if first.Path() != second.Path() {
+// mergeSegments combines two different segments and returns the combined object.
+// It assumes that the root of each segment have identical paths.
+func mergeSegments(first, second *segment) (*segment, error) {
+	if first.Path != second.Path {
 		return nil, errors.New("May only merge segments with the same path")
 	}
 
-	merged := NewSegment(first.Path())
+	merged := newSegment(first.Path)
 
-	addChildren := func(children []Segment) error {
+	addChildren := func(children []*segment) error {
 		for _, child := range children {
 			if err := merged.AddChild(child); err != nil {
 				return err
@@ -185,7 +87,7 @@ func MergeSegments(first, second Segment) (Segment, error) {
 		return nil
 	}
 
-	addEndpoints := func(endpoints []Endpoint) error {
+	addEndpoints := func(endpoints []endpoint) error {
 		for _, endpoint := range endpoints {
 			if err := merged.AddEndpoint(endpoint); err != nil {
 				return err
@@ -212,6 +114,58 @@ func MergeSegments(first, second Segment) (Segment, error) {
 	return merged, nil
 }
 
+// Children gets the list of paths that exist under the current path.
+func (s *segment) Children() []*segment {
+	children := make([]*segment, len(s.childOrder))
+	for idx, childPath := range s.childOrder {
+		children[idx] = s.children[childPath]
+	}
+
+	if s.paramChild != nil {
+		children = append(children, s.paramChild)
+	}
+
+	return children
+}
+
+// AddChild adds a child path that should exist under the current path.
+func (s *segment) AddChild(child *segment) error {
+	if isParam(child.Path) {
+		if s.paramChild != nil {
+			return fmt.Errorf("Segment %s already has a route with a parameter", s.Path)
+		}
+
+		s.paramChild = child
+		return nil
+	}
+
+	if currentChild, exists := s.children[child.Path]; exists {
+		merged, err := mergeSegments(currentChild, child)
+		if err != nil {
+			return err
+		}
+
+		s.children[child.Path] = merged
+		return nil
+	}
+
+	s.children[child.Path] = child
+
+	for idx, childPath := range s.childOrder {
+		if strings.Compare(child.Path, childPath) == 1 {
+			s.childOrder = append(s.childOrder, "")
+			copy(s.childOrder[idx+1:], s.childOrder[idx:])
+			s.childOrder[idx] = child.Path
+
+			return nil
+		}
+	}
+
+	s.childOrder = append(s.childOrder, child.Path)
+	return nil
+}
+
+// RemoveChild removes a child path from the current path.
 func (s *segment) RemoveChild(path string) error {
 	if isParam(path) {
 		s.paramChild = nil
@@ -219,20 +173,23 @@ func (s *segment) RemoveChild(path string) error {
 	}
 
 	if _, exists := s.children[path]; !exists {
-		return fmt.Errorf("Unable to remove child %s from segment %s: child does not exist", path, s.path)
+		return fmt.Errorf("Unable to remove child %s from segment %s: child does not exist", path, s.Path)
 	}
 
 	delete(s.children, path)
 	return nil
 }
 
-func (s *segment) Endpoint(method string) (Endpoint, bool) {
+// Endpoint gets the Endpoint that matches an HTTP method.
+func (s *segment) Endpoint(method string) (endpoint, bool) {
 	endpoint, found := s.endpoints[method]
 	return endpoint, found
 }
 
-func (s *segment) Endpoints() []Endpoint {
-	endpoints := make([]Endpoint, len(s.endpoints))
+// Endpoints gets the list of HTTP endpoints that resolve exactly at this
+// path.
+func (s *segment) Endpoints() []endpoint {
+	endpoints := make([]endpoint, len(s.endpoints))
 	idx := 0
 
 	for _, endPt := range s.endpoints {
@@ -243,35 +200,29 @@ func (s *segment) Endpoints() []Endpoint {
 	return endpoints
 }
 
-func (s *segment) AddEndpoint(endPt Endpoint) error {
+// AddEndpoint adds an Endpoint to the Segment.
+func (s *segment) AddEndpoint(endPt endpoint) error {
 	if _, exists := s.endpoints[endPt.Method()]; exists {
-		return fmt.Errorf("Unable to add %s endpoint to segment %s: endpoint already exists", endPt.Method(), s.path)
+		return fmt.Errorf("Unable to add %s endpoint to segment %s: endpoint already exists", endPt.Method(), s.Path)
 	}
 
 	s.endpoints[endPt.Method()] = endPt
 	return nil
 }
 
-func (s *segment) RemoveEndpoint(method string) error {
-	if _, exists := s.endpoints[method]; !exists {
-		return fmt.Errorf("Unable to remove %s endpoint from segment %s: endpoint does not exist", method, s.path)
-	}
-
-	delete(s.endpoints, method)
-	return nil
-}
-
-func (s *segment) Matches(path string) (*Match, bool) {
+// Matches checks a path against the current Segment's endpoints.
+// If a match doesn't exist, it checks against the Segment's children.
+func (s *segment) Matches(path string) (*match, bool) {
 	head, tail := splitPath(path)
 
-	if head != s.path && !isParam(s.path) {
+	if head != s.Path && !isParam(s.Path) {
 		return nil, false
 	}
 
 	if tail == "" {
-		match := NewMatch(s, path)
-		if isParam(s.path) {
-			match.AddParam(s.path[1:], head)
+		match := newMatch(s, path)
+		if isParam(s.Path) {
+			match.AddParam(s.Path[1:], head)
 		}
 		return match, true
 	}
@@ -281,8 +232,8 @@ func (s *segment) Matches(path string) (*Match, bool) {
 		match, matches := child.Matches(tail)
 		if matches {
 			match.RequestURI = path
-			if isParam(s.path) {
-				match.AddParam(s.path[1:], head)
+			if isParam(s.Path) {
+				match.AddParam(s.Path[1:], head)
 			}
 			return match, matches
 		}
@@ -292,7 +243,7 @@ func (s *segment) Matches(path string) (*Match, bool) {
 		match, matches := s.paramChild.Matches(tail)
 		if matches {
 			match.RequestURI = path
-			match.AddParam(s.path[1:], head)
+			match.AddParam(s.Path[1:], head)
 			return match, matches
 		}
 	}

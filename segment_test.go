@@ -31,11 +31,11 @@ func TestSegmentChildren(t *testing.T) {
 
 	var errAdding bool
 	for testIdx, test := range tests {
-		root := NewSegment("/")
+		root := newSegment("/")
 		for _, toInsert := range test.insertions {
-			child := NewSegment(toInsert)
+			child := newSegment(toInsert)
 			if err := root.AddChild(child); err != nil {
-				t.Errorf("Segment.AddChild({path: %s}) error, want <nil>, got %v", child.Path(), err)
+				t.Errorf("Segment.AddChild({path: %s}) error, want <nil>, got %v", child.Path, err)
 				errAdding = true
 			}
 		}
@@ -51,8 +51,8 @@ func TestSegmentChildren(t *testing.T) {
 		}
 
 		for idx, wantChild := range test.wantChildren {
-			if wantChild != gotChildren[idx].Path() {
-				t.Errorf("Test %d: Path of child %d, want %s, got %s", testIdx, idx, wantChild, gotChildren[idx].Path())
+			if wantChild != gotChildren[idx].Path {
+				t.Errorf("Test %d: Path of child %d, want %s, got %s", testIdx, idx, wantChild, gotChildren[idx].Path)
 			}
 		}
 	}
@@ -61,31 +61,31 @@ func TestSegmentChildren(t *testing.T) {
 func TestAdvancedSegmentMatching(t *testing.T) {
 	var called bool
 
-	badHandler := func(c *Context) Response {
+	badHandler := func(c Context) Response {
 		called = false
-		return InternalServiceError
+		return internalServiceError
 	}
 
-	goodHandler := func(c *Context) Response {
+	goodHandler := func(c Context) Response {
 		called = true
-		return InternalServiceError
+		return internalServiceError
 	}
 
-	dynamic, err := NewSegmentEndpoint("/products/:id", http.MethodGet, badHandler)
+	dynamic, err := newSegmentEndpoint("/products/:id", http.MethodGet, badHandler)
 	if err != nil {
-		t.Errorf("NewSegmentEndpoint(%s, %s, fn), want <nil> err, got %v err", "/products/:id", http.MethodGet, err)
+		t.Errorf("newSegmentEndpoint(%s, %s, fn), want <nil> err, got %v err", "/products/:id", http.MethodGet, err)
 		return
 	}
 
-	static, err := NewSegmentEndpoint("/products/new", http.MethodGet, goodHandler)
+	static, err := newSegmentEndpoint("/products/new", http.MethodGet, goodHandler)
 	if err != nil {
-		t.Errorf("NewSegmentEndpoint(%s, %s, fn), want <nil> err, got %v err", "/products/new", http.MethodGet, err)
+		t.Errorf("newSegmentEndpoint(%s, %s, fn), want <nil> err, got %v err", "/products/new", http.MethodGet, err)
 		return
 	}
 
-	merged, err := MergeSegments(dynamic, static)
+	merged, err := mergeSegments(dynamic, static)
 	if err != nil {
-		t.Errorf("MergeSegments(), want <nil> err, got %v err", err)
+		t.Errorf("mergeSegments(), want <nil> err, got %v err", err)
 		return
 	}
 
@@ -111,8 +111,8 @@ func TestAdvancedSegmentMatching(t *testing.T) {
 }
 
 func TestSegmentMatching(t *testing.T) {
-	dummyHandler := func(context *Context) Response {
-		return InternalServiceError
+	dummyHandler := func(context Context) Response {
+		return internalServiceError
 	}
 
 	var tests = []struct {
@@ -132,7 +132,7 @@ func TestSegmentMatching(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		seg, err := NewSegmentEndpoint(test.uri, test.method, dummyHandler)
+		seg, err := newSegmentEndpoint(test.uri, test.method, dummyHandler)
 		if err != nil {
 			t.Errorf("NewSegmentEndpoint(%s, %s) error, want <nil>, got %v", test.uri, test.method, err)
 			continue

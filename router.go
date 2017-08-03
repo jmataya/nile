@@ -16,13 +16,13 @@ type Router interface {
 }
 
 type router struct {
-	segments map[string]Segment
+	segments map[string]*segment
 }
 
 // New creates a new Router instance.
 func New() Router {
 	return &router{
-		segments: map[string]Segment{},
+		segments: map[string]*segment{},
 	}
 }
 
@@ -44,7 +44,7 @@ func (r *router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	path := req.URL.Path
 	method := req.Method
 
-	var match *Match
+	var match *match
 	var hasMatch bool
 	for _, segment := range r.segments {
 		match, hasMatch = segment.Matches(path)
@@ -54,18 +54,18 @@ func (r *router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	if !hasMatch {
-		r.writeResponse(ResourceNotFound, w)
+		r.writeResponse(resourceNotFound, w)
 		return
 	}
 
 	endpoint, found := match.Segment.Endpoint(method)
 	if !found {
-		r.writeResponse(MethodNotAllowed, w)
+		r.writeResponse(methodNotAllowed, w)
 		return
 	}
 
 	context := match.Context
-	context.Request = req
+	context.setRequest(req)
 	handler := endpoint.Handler()
 
 	resp := handler(context)
@@ -86,21 +86,49 @@ func (r *router) writeResponse(resp Response, w http.ResponseWriter) {
 // GET adds a GET request for the matching path that executes the corresponding
 // HandlerFunc upon a match.
 func (r *router) GET(path string, fn HandlerFunc) error {
-	seg, err := NewSegmentEndpoint(path, http.MethodGet, fn)
+	return r.addRoute(path, http.MethodGet, fn)
+}
+
+// POST adds a POST request for the matching path that executes the
+// corresponding HandlerFunc upon a match.
+func (r *router) POST(path string, fn HandlerFunc) error {
+	return r.addRoute(path, http.MethodPost, fn)
+}
+
+// PATCH adds a PATCH request for the matching path that executes the
+// corresponding HandlerFunc upon a match.
+func (r *router) PATCH(path string, fn HandlerFunc) error {
+	return r.addRoute(path, http.MethodPatch, fn)
+}
+
+// PUT adds a PUT request for the matching path that executes the corresponding
+// HandlerFunc upon a match.
+func (r *router) PUT(path string, fn HandlerFunc) error {
+	return r.addRoute(path, http.MethodPut, fn)
+}
+
+// DELETE adds a DELETE request for the matching path that executes the
+// corresponding HandlerFunc upon a match.
+func (r *router) DELETE(path string, fn HandlerFunc) error {
+	return r.addRoute(path, http.MethodDelete, fn)
+}
+
+func (r *router) addRoute(path string, method string, handler HandlerFunc) error {
+	seg, err := newSegmentEndpoint(path, method, handler)
 	if err != nil {
 		return err
 	}
 
-	existing, found := r.segments[seg.Path()]
+	existing, found := r.segments[seg.Path]
 	if found {
-		merged, err := MergeSegments(existing, seg)
+		merged, err := mergeSegments(existing, seg)
 		if err != nil {
 			return err
 		}
 
-		r.segments[seg.Path()] = merged
+		r.segments[seg.Path] = merged
 	} else {
-		r.segments[seg.Path()] = seg
+		r.segments[seg.Path] = seg
 	}
 
 	return nil
