@@ -1,5 +1,7 @@
 # Nile
 
+[![Build Status](https://travis-ci.org/jmataya/nile.svg?branch=master)](https://travis-ci.org/jmataya/nile)  
+
 Yet another routing and HTTP library for Go. Nile aims to be different by
 offering an opinionated setup for HTTP routing, managing payloads, responses,
 and error messaging.
