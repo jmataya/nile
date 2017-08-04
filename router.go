@@ -11,7 +11,27 @@ import (
 
 // Router is the basic foundation of the HTTP server.
 type Router interface {
+	// GET adds a GET request for the matching path that executes the corresponding
+	// HandlerFunc upon a match.
 	GET(path string, fn HandlerFunc) error
+
+	// POST adds a POST request for the matching path that executes the
+	// corresponding HandlerFunc upon a match.
+	POST(path string, fn HandlerFunc) error
+
+	// PATCH adds a PATCH request for the matching path that executes the
+	// corresponding HandlerFunc upon a match.
+	PATCH(path string, fn HandlerFunc) error
+
+	// PUT adds a PUT request for the matching path that executes the corresponding
+	// HandlerFunc upon a match.
+	PUT(path string, fn HandlerFunc) error
+
+	// DELETE adds a DELETE request for the matching path that executes the
+	// corresponding HandlerFunc upon a match.
+	DELETE(path string, fn HandlerFunc) error
+
+	// Start initializes the router.
 	Start(addr string) error
 }
 
@@ -83,32 +103,22 @@ func (r *router) writeResponse(resp Response, w http.ResponseWriter) {
 	w.Write(respBytes)
 }
 
-// GET adds a GET request for the matching path that executes the corresponding
-// HandlerFunc upon a match.
 func (r *router) GET(path string, fn HandlerFunc) error {
 	return r.addRoute(path, http.MethodGet, fn)
 }
 
-// POST adds a POST request for the matching path that executes the
-// corresponding HandlerFunc upon a match.
 func (r *router) POST(path string, fn HandlerFunc) error {
 	return r.addRoute(path, http.MethodPost, fn)
 }
 
-// PATCH adds a PATCH request for the matching path that executes the
-// corresponding HandlerFunc upon a match.
 func (r *router) PATCH(path string, fn HandlerFunc) error {
 	return r.addRoute(path, http.MethodPatch, fn)
 }
 
-// PUT adds a PUT request for the matching path that executes the corresponding
-// HandlerFunc upon a match.
 func (r *router) PUT(path string, fn HandlerFunc) error {
 	return r.addRoute(path, http.MethodPut, fn)
 }
 
-// DELETE adds a DELETE request for the matching path that executes the
-// corresponding HandlerFunc upon a match.
 func (r *router) DELETE(path string, fn HandlerFunc) error {
 	return r.addRoute(path, http.MethodDelete, fn)
 }
