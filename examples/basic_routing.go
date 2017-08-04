@@ -48,14 +48,14 @@ func main() {
 }
 
 type basicResp struct {
-	Message    string `json:"message"`
+	Message    string
 	statusCode int
+}
+
+func (b basicResp) Body() interface{} {
+	return map[string]string{"message": b.Message}
 }
 
 func (b basicResp) StatusCode() int {
 	return b.statusCode
-}
-
-func (b basicResp) Status() string {
-	return http.StatusText(b.statusCode)
 }

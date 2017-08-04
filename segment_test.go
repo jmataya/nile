@@ -63,12 +63,14 @@ func TestAdvancedSegmentMatching(t *testing.T) {
 
 	badHandler := func(c Context) Response {
 		called = false
-		return internalServiceError
+		resp := map[string]string{"message": "hello"}
+		return NewGenericResponse(http.StatusOK, resp)
 	}
 
 	goodHandler := func(c Context) Response {
 		called = true
-		return internalServiceError
+		resp := map[string]string{"message": "hello"}
+		return NewGenericResponse(http.StatusOK, resp)
 	}
 
 	dynamic, err := newSegmentEndpoint("/products/:id", http.MethodGet, badHandler)
@@ -112,7 +114,8 @@ func TestAdvancedSegmentMatching(t *testing.T) {
 
 func TestSegmentMatching(t *testing.T) {
 	dummyHandler := func(context Context) Response {
-		return internalServiceError
+		resp := map[string]string{"message": "hello"}
+		return NewGenericResponse(http.StatusOK, resp)
 	}
 
 	var tests = []struct {

@@ -74,13 +74,13 @@ func (r *router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	if !hasMatch {
-		r.writeResponse(resourceNotFound, w)
+		r.writeResponse(NewResourceNotFound(), w)
 		return
 	}
 
 	endpoint, found := match.Segment.Endpoint(method)
 	if !found {
-		r.writeResponse(methodNotAllowed, w)
+		r.writeResponse(NewMethodNotAllowed(), w)
 		return
 	}
 
@@ -93,7 +93,7 @@ func (r *router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func (r *router) writeResponse(resp Response, w http.ResponseWriter) {
-	respBytes, err := json.Marshal(resp)
+	respBytes, err := json.Marshal(resp.Body())
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return

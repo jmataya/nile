@@ -4,5 +4,5 @@ package nile
 // defines the methodology for how their contents get validated.
 type Payload interface {
 	// Validate ensures that the Payload and its values are structured properly.
-	Validate() error
+	Validate() *ErrorResponse
 }

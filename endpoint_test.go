@@ -30,7 +30,8 @@ func TestEndpointMethods(t *testing.T) {
 		method := test.method
 
 		dummyHandler := func(Context) Response {
-			return internalServiceError
+			resp := map[string]string{"message": "hello"}
+			return NewGenericResponse(http.StatusOK, resp)
 		}
 
 		endpoint, err := newEndpoint(method, dummyHandler)

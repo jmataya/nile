@@ -37,7 +37,7 @@ type Context interface {
 }
 
 type context struct {
-	err     error
+	err     *ErrorResponse
 	params  map[string]string
 	request *http.Request
 }
@@ -49,11 +49,11 @@ func (c *context) BindJSON(payload Payload) error {
 
 	decoder := json.NewDecoder(c.request.Body)
 	if err := decoder.Decode(payload); err != nil {
-		return c.setError(NewBadRequest(err))
+		return c.setError(NewJSONMalformedError(err))
 	}
 
 	if err := payload.Validate(); err != nil {
-		return c.setError(NewBadRequest(err))
+		return c.setError(err)
 	}
 
 	return nil
@@ -63,7 +63,7 @@ func (c *context) Error() error {
 	return c.err
 }
 
-func (c *context) setError(er ErrorResponse) error {
+func (c *context) setError(er *ErrorResponse) error {
 	c.err = er
 	return er
 }
