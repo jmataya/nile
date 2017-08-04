@@ -24,5 +24,5 @@ func (m *match) AddParam(key, value string) {
 
 // Param gets the value of a param, if it exists.
 func (m *match) Param(key string) (string, bool) {
-	return m.Context.Param(key)
+	return m.Context.TryParam(key)
 }
